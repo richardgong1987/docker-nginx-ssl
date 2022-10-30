@@ -1,23 +1,29 @@
-version: '3.8'
 services:
-  server:
-    image: node:12-alpine
+  nginx:
+    container_name: nginx
+    image: nginxproxy/nginx-proxy
+    restart: unless-stopped
     ports:
-      - '8080:80'
+      - 80:80
+      - 443:443
     volumes:
-      - ./server:/root/server
-    env_file:
-      - ./deploy/server.env
-    entrypoint: sh /root/server/start_server.sh
-  frontend:
-    build:
-      context: ./deploy
-      dockerfile: Dockerfile
-    ports:
-      - '80:80'
-      - '443:443'
+      - ./var/run/docker.sock:/tmp/docker.sock:ro
+      - ./var/docker/nginx/html:/usr/share/nginx/html
+      - ./var/docker/nginx/certs:/etc/nginx/certs
+      - ./var/docker/nginx/vhost:/etc/nginx/vhost.d
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  letsencrypt-companion:
+    container_name: letsencrypt-companion
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: unless-stopped
+    volumes_from:
+      - nginx
     volumes:
-      - ./frontend/build:/var/www/html
-      - ./deploy/default.conf:/etc/nginx/sites-available/default
-    depends_on:
-      - server
+      - ./var/run/docker.sock:/var/run/docker.sock
+      - ./var/docker/nginx/acme:/etc/acme.sh
+    environment:
+      DEFAULT_EMAIL: richardgong1988@gmail.com
